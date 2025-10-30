@@ -15,8 +15,7 @@
         android:usesCleartextTraffic="false"
         android:allowBackup="true"
         android:label="Pro Destino"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.Material3.DayNight.NoActionBar">
         <activity
