@@ -1,80 +1,44 @@
 name: Build Android APK/AAB
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
 
-      - uses: android-actions/setup-android@v3
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      # Instala Gradle 8.9 via SDKMAN e gera o wrapper correto
-      - name: Install Gradle 8.9 via SDKMAN and generate wrapper
+      - name: Install Android build tools and platforms
         run: |
-          curl -s https://get.sdkman.io | bash
-          source "$HOME/.sdkman/bin/sdkman-init.sh"
-          sdk install gradle 8.9
-          gradle -v
-          gradle wrapper --gradle-version 8.9
-          chmod +x gradlew
+          sdkmanager --install "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+          yes | sdkmanager --licenses
 
-      # (Opcional) restaurar keystore a partir de segredo; se vazio, ignora
-      - name: Decode keystore (optional)
-        run: |
-          if [ -n "${KEYSTORE_BASE64}" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
-            echo "Keystore written."
-          else
-            echo "No keystore provided. Building unsigned debug/release."
-          fi
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      # ⚠️ Em vez de SDKMAN/gradle wrapper manual, use a ação oficial do Gradle
+      - name: Build Debug (APK)
+        uses: gradle/gradle-build-action@v3
+        with:
+          # instala e usa exatamente essa versão de Gradle sem depender do wrapper
+          gradle-version: 8.9
+          arguments: assembleDebug --stacktrace --no-daemon
 
-      # Cria signing.properties somente se o keystore existir (sem here-doc)
-      - name: Create signing properties (optional)
-        run: |
-          if [ -f app/release.keystore ]; then
-            {
-              echo "storeFile=release.keystore"
-              echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
-              echo "keyAlias=${{ secrets.KEY_ALIAS }}"
-              echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
-            } > app/signing.properties
-            echo "signing.properties created."
-          else
-            echo "No keystore: skipping signing.properties."
-          fi
-
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
-
-      - name: Build release (signed if keystore exists)
-        run: |
-          if [ -f app/release.keystore ]; then
-            ./gradlew assembleRelease
-            ./gradlew bundleRelease
-          else
-            # ainda gera o release sem assinar (útil para testar artefatos)
-            ./gradlew assembleRelease
-          fi
-
-      - name: Upload artifacts
+      - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: prodestino-build
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
