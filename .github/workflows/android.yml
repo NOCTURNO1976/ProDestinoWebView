@@ -20,7 +20,7 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      # Instala Gradle 8.9 com SDKMAN e gera o wrapper correto
+      # Instala Gradle 8.9 via SDKMAN e gera o wrapper correto
       - name: Install Gradle 8.9 via SDKMAN and generate wrapper
         run: |
           curl -s https://get.sdkman.io | bash
@@ -30,7 +30,7 @@ jobs:
           gradle wrapper --gradle-version 8.9
           chmod +x gradlew
 
-      # (Opcional) restaurar o keystore a partir do segredo; se vazio, ignora
+      # (Opcional) restaurar keystore a partir de segredo; se vazio, ignora
       - name: Decode keystore (optional)
         run: |
           if [ -n "${KEYSTORE_BASE64}" ]; then
@@ -42,16 +42,16 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      # Cria signing.properties somente se o keystore existir
+      # Cria signing.properties somente se o keystore existir (sem here-doc)
       - name: Create signing properties (optional)
         run: |
           if [ -f app/release.keystore ]; then
-            cat > app/signing.properties <<EOF
-            storeFile=release.keystore
-            storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-            keyAlias=${{ secrets.KEY_ALIAS }}
-            keyPassword=${{ secrets.KEY_PASSWORD }}
-            EOF
+            {
+              echo "storeFile=release.keystore"
+              echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+              echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+              echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+            } > app/signing.properties
             echo "signing.properties created."
           else
             echo "No keystore: skipping signing.properties."
@@ -66,7 +66,7 @@ jobs:
             ./gradlew assembleRelease
             ./gradlew bundleRelease
           else
-            # ainda gera o release sem assinar (útil p/ testar artefatos)
+            # ainda gera o release sem assinar (útil para testar artefatos)
             ./gradlew assembleRelease
           fi
 
