@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -19,13 +20,30 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: Decode keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
-        run: echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+      # Instala Gradle 8.9 com SDKMAN e gera o wrapper correto
+      - name: Install Gradle 8.9 via SDKMAN and generate wrapper
+        run: |
+          curl -s https://get.sdkman.io | bash
+          source "$HOME/.sdkman/bin/sdkman-init.sh"
+          sdk install gradle 8.9
+          gradle -v
+          gradle wrapper --gradle-version 8.9
+          chmod +x gradlew
+
+      # (Opcional) restaurar o keystore a partir do segredo; se vazio, ignora
+      - name: Decode keystore (optional)
+        run: |
+          if [ -n "${KEYSTORE_BASE64}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > app/release.keystore
+            echo "Keystore written."
+          else
+            echo "No keystore provided. Building unsigned debug/release."
+          fi
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      - name: Create signing properties
+      # Cria signing.properties somente se o keystore existir
+      - name: Create signing properties (optional)
         run: |
           if [ -f app/release.keystore ]; then
             cat > app/signing.properties <<EOF
@@ -34,30 +52,22 @@ jobs:
             keyAlias=${{ secrets.KEY_ALIAS }}
             keyPassword=${{ secrets.KEY_PASSWORD }}
             EOF
-          fi
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew || true
-
-      # Gera o Gradle Wrapper se ainda não existir
-      - name: Generate Gradle wrapper if missing
-        run: |
-          if [ ! -f gradlew ]; then
-            sudo apt-get update && sudo apt-get install -y gradle
-            gradle wrapper
-            chmod +x gradlew
+            echo "signing.properties created."
+          else
+            echo "No keystore: skipping signing.properties."
           fi
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
-      - name: Build signed release (if keystore provided)
+      - name: Build release (signed if keystore exists)
         run: |
           if [ -f app/release.keystore ]; then
             ./gradlew assembleRelease
             ./gradlew bundleRelease
           else
-            echo "No keystore: skipping signed release."
+            # ainda gera o release sem assinar (útil p/ testar artefatos)
+            ./gradlew assembleRelease
           fi
 
       - name: Upload artifacts
