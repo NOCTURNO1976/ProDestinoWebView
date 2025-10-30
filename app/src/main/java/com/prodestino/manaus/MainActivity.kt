@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.view.View
 import android.webkit.*
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
@@ -38,6 +39,11 @@ class MainActivity : ComponentActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Back físico: usa Dispatcher (correto nas versões novas)
+        onBackPressedDispatcher.addCallback(this) {
+            if (binding.webview.canGoBack()) binding.webview.goBack() else finish()
+        }
+
         goImmersive()
         setupWebView(binding.webview)
         if (savedInstanceState == null) binding.webview.loadUrl(APP_URL)
@@ -47,7 +53,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() { super.onResume(); goImmersive() }
     override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus) goImmersive() }
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); binding.webview.saveState(outState) }
-    override fun onBackPressed() { if (binding.webview.canGoBack()) binding.webview.goBack() else super.onBackPressed() }
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView(wv: WebView) {
@@ -79,7 +84,9 @@ class MainActivity : ComponentActivity() {
             }
             override fun onPermissionRequest(req: PermissionRequest?) { req?.grant(req.resources) }
             override fun onShowFileChooser(wv: WebView?, cb: ValueCallback<Array<Uri>>?, params: FileChooserParams?): Boolean {
-                filePathCallback = cb; pickFiles.launch(params?.acceptTypes?.firstOrNull() ?: "*/*"); return true
+                filePathCallback = cb
+                pickFiles.launch(params?.acceptTypes?.firstOrNull() ?: "*/*")
+                return true
             }
         }
 
