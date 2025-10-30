@@ -28,14 +28,26 @@ jobs:
           sdkmanager --install "platform-tools" "build-tools;34.0.0" "platforms;android-34"
           yes | sdkmanager --licenses
 
-      # Valida integridade do wrapper (previne supply-chain em gradle-wrapper.jar)
+      # 1) Gera o Gradle Wrapper (o repo não tem os arquivos do wrapper)
+      - name: Generate Gradle Wrapper (8.9)
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.9
+          arguments: wrapper --gradle-version 8.9 --distribution-type bin
+
+      # 2) Assegura permissão de execução
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # 3) Valida o wrapper gerado (segurança/supply-chain)
       - name: Validate Gradle Wrapper
         uses: gradle/wrapper-validation-action@v2
 
-      # Usa o wrapper do projeto
+      # 4) Build usando o wrapper recém-gerado
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
+      # 5) Publica o APK como artifact
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
